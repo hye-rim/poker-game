@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>포커</title>
+<style>
+  /* 아이폰 사파리: 버튼을 누르다 글자가 선택되거나 길게 눌러 복사 메뉴가 뜨지 않게 */
+  *, *::before, *::after { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100%; overflow:hidden; background:#06140c;
+    font-family:-apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; color:#fff;
+    touch-action:none;
+  }
+  #stage { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:6px 8px; }
+  #wrap { position:relative; background:#000; }
+  #game { display:block; touch-action:none; image-rendering:pixelated; }
+  #overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:14px; background:rgba(0,0,0,.82); }
+  #overlay.hidden { display:none; }
+  #overlay h1 { font-size:46px; font-weight:900; letter-spacing:.06em; color:#ffe14a; text-shadow:0 3px 0 #8a5a0a; }
+  #overlay h2 { font-size:24px; font-weight:900; }
+  #overlay p { font-size:13px; color:#e6e6e6; line-height:1.6; }
+  #overlay .big { font-size:18px; font-weight:800; color:#ffd23a; }
+  #overlay .help { font-size:12px; color:#bdbdbd; line-height:1.7; }
+  #overlay button { margin-top:6px; background:linear-gradient(180deg,#ffe9a0,#e8a82a); color:#2a1a00; font-weight:900; font-size:17px; border:none; border-radius:999px; padding:12px 34px; box-shadow:0 4px 0 #8a5a0a; cursor:pointer; }
+  #overlay button:active { transform:translateY(3px); box-shadow:0 1px 0 #8a5a0a; }
+  #top { position:absolute; right:3px; top:2px; display:flex; gap:6px; z-index:2; }
+  #top button { position:relative; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.25); color:#fff; width:30px; height:30px; border-radius:8px; font-size:13px; cursor:pointer; }
+  #top button::after { content:''; position:absolute; inset:-7px -4px; }
+  /* 조작판: 폴드 · 체크/콜 · 레이즈 (레이즈를 누르면 금액을 고르는 줄로 바뀐다) */
+  #controls { display:flex; width:100%; max-width:420px; flex-direction:column; justify-content:center; gap:5px; height:136px; }
+  #controls .row { display:flex; gap:8px; justify-content:center; }
+  #controls .row.hidden { display:none; }
+  #controls button { flex:1; height:50px; border-radius:14px; border:2px solid rgba(255,255,255,.25); background:rgba(255,255,255,.1); color:#fff; font-size:15px; font-weight:800; touch-action:manipulation; }
+  #controls button small { display:block; font-size:11px; font-weight:600; opacity:.8; }
+  #controls button:disabled { opacity:.35; }
+  #btnFold { background:linear-gradient(180deg,#e88a8a,#b03a3a); }
+  #btnCall { background:linear-gradient(180deg,#8ae8a8,#2a9a52); }
+  #btnRaise { background:linear-gradient(180deg,#ffd98a,#d89a2a); color:#2a1a00; }
+  #btnConfirm { background:linear-gradient(180deg,#ffd98a,#d89a2a); color:#2a1a00; flex:2; }
+  #btnNext { background:linear-gradient(180deg,#9ac8ff,#2a6ac4); }
+  #presets button { height:34px; font-size:12px; border-radius:10px; }
+  #raiseSlider { width:100%; accent-color:#ffd23a; height:28px; }
+  .pc { display:inline; } .touch { display:none; }
+  @media (pointer:coarse) { .pc { display:none; } .touch { display:inline; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="wrap">
+    <canvas id="game"></canvas>
+    <div id="top">
+      <button id="muteBtn" title="소리 (M)">🔊</button>
+      <button id="pauseBtn" title="일시정지 (P)">⏸</button>
+    </div>
+    <div id="overlay">
+      <h1>포커</h1>
+      <p>컴퓨터 세 명과 겨루는 <b>텍사스 홀덤</b>! ♠️♥️<br>게임용 칩 1000개로 시작해서 모두의 칩을 따 보세요 (진짜 돈이 아니에요)</p>
+      <div class="help">
+        <span class="pc">⌨️ F 폴드 · C 체크/콜 · R 레이즈 · 1~4 금액 선택 · Enter 확정 · N 다음 판</span>
+        <span class="touch">👆 아래 버튼으로 폴드 · 체크/콜 · 레이즈</span>
+      </div>
+      <button id="startBtn">시작하기</button>
+    </div>
+  </div>
+  <div id="controls">
+    <div class="row" id="mainRow"><button id="btnFold">폴드</button><button id="btnCall">체크</button><button id="btnRaise">레이즈</button></div>
+    <div class="row hidden" id="raisePanel"><input id="raiseSlider" type="range" min="0" max="100" value="0"></div>
+    <div class="row hidden" id="presets"><button id="pMin">최소</button><button id="pHalf">½ 팟</button><button id="pPot">팟</button><button id="pAll">올인</button></div>
+    <div class="row hidden" id="confirmRow"><button id="btnCancel">취소</button><button id="btnConfirm">레이즈</button></div>
+    <div class="row hidden" id="nextRow"><button id="btnNext">다음 판</button></div>
+  </div>
+</div>
+<script src="logic.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
