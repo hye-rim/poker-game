@@ -85,19 +85,25 @@ window.__pk = { get G() { return G; }, get state() { return state; }, L, setG(g)
 /* @test-hooks:end */
 
 // ---------- 흐름 ----------
-function showOverlay(html) { const o = $('overlay'); o.innerHTML = html; o.classList.remove('hidden'); o.querySelector('button').onclick = onOverlayButton; }
+function bindOverlay() { document.querySelectorAll('#overlay button').forEach((b) => { b.onclick = () => onOverlayButton(b.dataset.level); }); }
+function showOverlay(html) { const o = $('overlay'); o.innerHTML = html; o.classList.remove('hidden'); bindOverlay(); }
+const LEVEL_BUTTONS = '<div class="lv"><button id="startBtn" data-level="easy">쉬움<small>컴퓨터가 허세·올인을 덜 해요</small></button><button id="startBtn2" data-level="normal">보통<small>컴퓨터가 실수하지 않아요</small></button></div><p class="note">쉬움에서는 최고 기록이 저장되지 않아요</p>';
 function hideOverlay() { $('overlay').classList.add('hidden'); }
 function setBanner(text, sub = '', t = 2.5) { banner = { text, sub, t }; }
-function startGame() {
-  G = L.newGame();
+function startGame(level) {
+  if (/[?&]tutorial=1/.test(location.search)) level = 'easy';
+  level = level || store.get('pokerLevel');
+  level = level === 'normal' ? 'normal' : 'easy';
+  G = L.newGame(Math.random, { level });
+  store.set('pokerLevel', level);
   labels = G.players.map(() => ''); fxs = []; shown = []; raising = false; cpuT = 0; nextT = 0; lastResultText = ''; peak = L.START_CHIPS;
   state = 'play';
   hideOverlay(); sfx.start();
   handleEvents();
-  setBanner('HAND 1', '블라인드 10 / 20', 2);
+  setBanner('HAND 1', `블라인드 10 / 20 · ${G.difficulty === 'easy' ? '쉬움' : '보통'}`, 2);
   refreshButtons();
 }
-function onOverlayButton() { if (state === 'paused') resume(); else startGame(); }
+function onOverlayButton(level) { if (state === 'paused') resume(); else startGame(level); }
 let pausedFrom = null;
 function pause() {
   if (state !== 'play') return;
@@ -109,7 +115,7 @@ function endGame() {
   state = 'over';
   const won = G.winner === 0;
   (won ? sfx.win : sfx.lose)();
-  showOverlay(`<h2>${won ? '🏆 모두 이겼어요!' : '칩이 다 떨어졌어요'}</h2><p class="big">${G.hand}번째 판까지 했어요</p><p>가장 많이 가졌던 칩: ${peak} (최고 ${bestChips})</p><button id="startBtn">다시 하기</button>`);
+  showOverlay(`<h2>${won ? '🏆 모두 이겼어요!' : '칩이 다 떨어졌어요'}</h2><p class="big">${G.hand}번째 판까지 했어요</p><p>가장 많이 가졌던 칩: ${peak} (${G.difficulty === 'easy' ? '쉬움 · 기록 저장 안 됨' : '최고 ' + bestChips})</p>${LEVEL_BUTTONS}`);
 }
 
 function handleEvents() {
@@ -151,7 +157,7 @@ function update(dt) {
     }
   } else if (G.phase === 'handover') {
     nextT += dt;
-    if (nextT === dt) { refreshButtons(); peak = Math.max(peak, G.players[0].chips); if (peak > bestChips) { bestChips = peak; store.set('pokerBest', String(bestChips)); } }
+    if (nextT === dt) { refreshButtons(); peak = Math.max(peak, G.players[0].chips); if (G.difficulty === 'normal' && peak > bestChips) { bestChips = peak; store.set('pokerBest', String(bestChips)); } }
     if (nextT > (fast() ? 1.2 : 6)) goNext();
   } else if (G.phase === 'over') { endGame(); }
 }
@@ -276,7 +282,7 @@ function frame(ts) {
 function toggleMute() { muted = !muted; store.set('pokerMuted', muted ? '1' : '0'); $('muteBtn').textContent = muted ? '🔇' : '🔊'; }
 $('muteBtn').onclick = (e) => { e.currentTarget.blur(); toggleMute(); };
 $('pauseBtn').onclick = (e) => { e.currentTarget.blur(); state === 'paused' ? resume() : pause(); };
-$('startBtn').onclick = onOverlayButton;
+bindOverlay();
 $('muteBtn').textContent = muted ? '🔇' : '🔊';
 addEventListener('blur', pause);
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });

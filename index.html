@@ -25,6 +25,10 @@
   #overlay .help { font-size:12px; color:#bdbdbd; line-height:1.7; }
   #overlay button { margin-top:6px; background:linear-gradient(180deg,#ffe9a0,#e8a82a); color:#2a1a00; font-weight:900; font-size:17px; border:none; border-radius:999px; padding:12px 34px; box-shadow:0 4px 0 #8a5a0a; cursor:pointer; }
   #overlay button:active { transform:translateY(3px); box-shadow:0 1px 0 #8a5a0a; }
+  #overlay .lv { display:flex; gap:10px; margin-top:6px; }
+  #overlay .lv button { margin-top:0; padding:10px 18px; font-size:16px; }
+  #overlay .lv small { display:block; font-size:10px; font-weight:600; opacity:.75; margin-top:2px; }
+  #overlay .note { font-size:11px; color:#aab; }
   #top { position:absolute; right:3px; top:2px; display:flex; gap:6px; z-index:2; }
   #top button { position:relative; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.25); color:#fff; width:30px; height:30px; border-radius:8px; font-size:13px; cursor:pointer; }
   #top button::after { content:''; position:absolute; inset:-7px -4px; }
@@ -61,7 +65,7 @@
         <span class="pc">⌨️ F 폴드 · C 체크/콜 · R 레이즈 · 1~4 금액 선택 · Enter 확정 · N 다음 판</span>
         <span class="touch">👆 아래 버튼으로 폴드 · 체크/콜 · 레이즈</span>
       </div>
-      <button id="startBtn">시작하기</button>
+      <div class="lv"><button id="startBtn" data-level="easy">쉬움<small>컴퓨터가 허세·올인을 덜 해요</small></button><button id="startBtn2" data-level="normal">보통<small>컴퓨터가 실수하지 않아요</small></button></div>
     </div>
   </div>
   <div id="controls">

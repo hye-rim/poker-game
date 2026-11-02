@@ -3,7 +3,7 @@
 const LOGIC_POKER = (() => {
   const START_CHIPS = 1000;
   const BLINDS = [[10, 20], [15, 30], [25, 50], [50, 100], [75, 150], [100, 200], [150, 300], [200, 400], [300, 600], [500, 1000]];
-  const HANDS_PER_LEVEL = 6;
+  const HANDS_PER_LEVEL = 10;
   const RANKS = '23456789TJQKA', SUITS = '♠♥♦♣';
   const CATEGORY = ['하이카드', '원페어', '투페어', '트리플', '스트레이트', '플러시', '풀하우스', '포카드', '스트레이트 플러시'];
   const STYLES = [
@@ -75,9 +75,10 @@ const LOGIC_POKER = (() => {
   // ---------- 게임 만들기 ----------
   function newGame(rand = Math.random, opts = {}) {
     const names = opts.names || ['나', ...STYLES.map((s) => s.name)];
+    const easy = opts.level === 'easy';
     const st = {
       rand, events: [], hand: 0, level: 0, phase: 'idle', board: [], deck: [], pots: [], pot: 0, dealer: -1,
-      players: names.map((name, i) => ({ name, human: i === 0, chips: opts.chips || START_CHIPS, hole: [], bet: 0, total: 0, folded: false, allIn: false, acted: false, out: false, style: i === 0 ? null : STYLES[(i - 1) % STYLES.length] })),
+      players: names.map((name, i) => ({ name, human: i === 0, chips: opts.chips || START_CHIPS, hole: [], bet: 0, total: 0, folded: false, allIn: false, acted: false, out: false, style: i === 0 ? null : STYLES[(i - 1) % STYLES.length], easy: easy && i > 0 })), difficulty: opts.level || 'normal',
       actor: -1, currentBet: 0, minRaise: 0, street: 'preflop', result: null, winner: null,
     };
     startHand(st);
@@ -289,8 +290,12 @@ const LOGIC_POKER = (() => {
     return score / sims;
   }
   function cpuDecide(st) {
-    const lg = legal(st), i = st.actor, p = st.players[i], style = p.style || STYLES[0];
-    const e = equity(st, i);
+    const lg = legal(st), i = st.actor, p = st.players[i];
+    // 쉬움: 허세를 부리지 않고, 덜 공격적이며, 올인과 큰 레이즈를 거의 하지 않는다
+    const base = p.style || STYLES[0];
+    const style = p.easy ? { ...base, aggr: base.aggr * 0.4, bluff: 0, tight: base.tight - 0.07 } : base;
+    // 쉬움: 패의 강도를 잘못 어림하고(±0.1), 약한 패로도 잘 따라오며, 레이즈를 훨씬 덜 한다
+    const e = Math.max(0, Math.min(1, equity(st, i) + (p.easy ? (st.rand() - 0.5) * 0.2 : 0)));
     const n = st.players.filter((q) => !q.out && !q.folded).length;
     const pot = lg.pot, toCall = lg.toCall;
     const fair = 1 / n;
@@ -309,9 +314,9 @@ const LOGIC_POKER = (() => {
     const need = odds + 0.03 + style.tight + (bigBet ? 0.1 : 0);
     if (e < need && r > style.bluff * 0.3) return { type: 'fold' };
     if (lg.canRaise && ((strength > 1.9 && r < style.aggr + 0.3) || (strength > 1.4 && r < style.aggr * 0.45))) {
-      const frac = strength > 2.4 ? 1 : strength > 1.7 ? 0.75 : 0.5;
+      const frac = (strength > 2.4 ? 1 : strength > 1.7 ? 0.75 : 0.5) * (p.easy ? 0.7 : 1);
       const to = sizeTo(frac);
-      if (to - p.bet >= p.chips * 0.55 && strength > 2.2) return { type: 'allin' };
+      if (!p.easy && to - p.bet >= p.chips * 0.55 && strength > 2.2) return { type: 'allin' };
       return { type: 'raise', to };
     }
     return { type: 'call' };

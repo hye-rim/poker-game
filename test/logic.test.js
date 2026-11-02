@@ -188,10 +188,11 @@ test('a player left with no chips is out; when you bust the game is over, when y
   assert.strictEqual(s2.phase, 'over'); assert.strictEqual(s2.winner, 0);
 });
 
-test('the blinds go up every 6 hands', () => {
+test('the blinds go up every 10 hands', () => {
+  assert.strictEqual(L.HANDS_PER_LEVEL, 10);
   const st = fresh(); assert.deepStrictEqual(L.blinds(st), [10, 20]);
-  for (let h = 0; h < 6; h++) { while (st.phase === 'bet') act(st, 'fold'); L.nextHand(st); }
-  assert.strictEqual(st.hand, 7); assert.deepStrictEqual(L.blinds(st), [15, 30]);
+  for (let h = 0; h < 10; h++) { while (st.phase === 'bet') act(st, 'fold'); L.nextHand(st); }
+  assert.strictEqual(st.hand, 11); assert.deepStrictEqual(L.blinds(st), [15, 30]);
   assert.strictEqual(st.players[st.bb].bet, 30);
 });
 
@@ -246,4 +247,26 @@ test('whole games of computer-vs-computer never break the rules: chips are conse
     }
     assert.ok(hands >= 5, 'hands were played: ' + hands);
   }
+});
+
+test('easy computers raise less than normal ones and never choose all-in', () => {
+  const count = (level) => {
+    let raises = 0, allins = 0, hands = 0;
+    for (let seed = 1; seed <= 8; seed++) {
+      const st = L.newGame(L.rng(seed * 17), { level }); st.players.forEach((p) => { p.human = false; });
+      for (let k = 0; k < 30000 && st.phase !== 'over' && hands < 2000; k++) {
+        if (st.phase === 'bet') { const d = L.cpuDecide(st); if (d.type === 'raise') raises++; if (d.type === 'allin') allins++; L.act(st, d) || L.act(st, { type: L.legal(st).canCheck ? 'check' : 'call' }); st.events = []; }
+        else if (st.phase === 'handover') { L.nextHand(st); hands++; }
+        if (hands > 20 * seed) break;
+      }
+    }
+    return { raises, allins };
+  };
+  const n = count('normal'), e = count('easy');
+  assert.ok(e.raises < n.raises, `raises ${e.raises} vs ${n.raises}`);
+  assert.strictEqual(e.allins, 0, 'easy computers never choose all-in on their own');
+  assert.ok(n.allins >= 0);
+  const g = L.newGame(L.rng(1), { level: 'easy' });
+  assert.strictEqual(g.players[0].easy, false); assert.ok(g.players.slice(1).every((p) => p.easy));
+  assert.strictEqual(L.newGame(L.rng(1)).difficulty, 'normal');
 });
